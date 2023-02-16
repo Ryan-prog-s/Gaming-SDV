@@ -1,0 +1,18 @@
+﻿@model WebGamingSDV.Models.VirtualM
+
+@{
+    ViewData["Title"] = "PowerOff";
+}
+
+<h1>PowerOff</h1>
+
+<h3>Are you sure you want to poweroff this?</h3>
+<div>
+    <h4>VirtualM</h4>
+    <hr />
+    <form asp-action="PowerOff">
+        <input type="hidden" asp-for="name" />
+        <input type="submit" value="PowerOff" class="btn btn-danger" /> |
+        <a asp-action="Index">Back to List</a>
+    </form>
+</div>
