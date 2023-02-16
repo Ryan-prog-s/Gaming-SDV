@@ -12,5 +12,8 @@ namespace WebGamingSDV.Data
         }
         public DbSet<VirtualM> VirtualMs { get ; set; }
 
+
+
+
 }
 }

@@ -32,14 +32,16 @@ namespace WebGamingSDV.Controllers
             return View();
         }
 
-        public async Task<IActionResult> CreateVM()
-        {
-            return View();
-        }
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
         {
             return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+        }
+
+        public IActionResult Login()
+        {
+            string url = "/Identity/Account/Login";
+            return Redirect(url);
         }
     }
 }

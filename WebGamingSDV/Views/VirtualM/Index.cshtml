@@ -46,6 +46,7 @@
                 <a asp-action="Delete" asp-route-id="@item.name">Delete</a> |
 
                 <a asp-action="PowerOff" asp-route-id="@item.name">PowerOff</a>
+                <a asp-action="PowerOn" asp-route-id="@item.name">PowerOn</a>
 
                 <a asp-action="Connect" asp-route-id="@item.name">Connect</a>
 
@@ -57,6 +58,7 @@
                      <input type="hidden" asp-for="@item.name" />
                     <input type="submit" value="PowerOff" class="btn btn-danger" /> |
                 </form>*@
+
             </td>
         </tr>
 }

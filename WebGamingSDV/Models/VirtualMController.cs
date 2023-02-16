@@ -21,9 +21,11 @@ using Microsoft.CodeAnalysis.Elfie.Serialization;
 using System.Xml.Linq;
 using System.Diagnostics;
 using Microsoft.Azure.Management.Compute.Fluent;
+using Gaming.Tools;
 
 namespace WebGamingSDV.Models
 {
+    [TypeFilter(typeof(AuthorizationFilter))]
     public class VirtualMController : Controller
     {
         private readonly ApplicationDbContext _context;
@@ -36,9 +38,9 @@ namespace WebGamingSDV.Models
         // GET: VirtualM
         public async Task<IActionResult> Index()
         {
-              return _context.VirtualMs != null ? 
-                          View(await _context.VirtualMs.ToListAsync()) :
-                          Problem("Entity set 'ApplicationDbContext.VirtualM'  is null.");
+            return _context.VirtualMs != null
+                ? View(await _context.VirtualMs.Where(vm => vm.name == GetUserName()).ToListAsync())
+                : Problem("Entity set 'ApplicationDbContext.VirtualMs'  is null.");
         }
 
         // GET: VirtualM/Details/5
@@ -70,146 +72,27 @@ namespace WebGamingSDV.Models
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]     
-        public async Task<IActionResult> Create([Bind("name,publicIp,login,password")] VirtualM VirtualM)
+        public async Task<IActionResult> Create([Bind("login,password")] VirtualM VirtualM)
         {
-            // Connection to Azure
-            ArmClient client = new ArmClient(new DefaultAzureCredential());
-            SubscriptionResource subscription = await client.GetDefaultSubscriptionAsync();
-            ResourceGroupCollection resourceGroups = subscription.GetResourceGroups();
+            ModelState.Remove(nameof(VirtualM.name));
+            ModelState.Remove(nameof(VirtualM.publicIp));
 
-            // With the collection, we can create a new resource group with an specific name
-
-            string resourceGroupName = "rg-gaming-" + GetUserName();
-            Console.WriteLine(resourceGroupName);
-            AzureLocation location = AzureLocation.NorthEurope;
-            ResourceGroupData resourceGroupData = new ResourceGroupData(location);
-            ArmOperation<ResourceGroupResource> operation = await resourceGroups.CreateOrUpdateAsync(WaitUntil.Completed, resourceGroupName, resourceGroupData);
-            ResourceGroupResource resourceGroup = operation.Value;
-            VirtualMachineCollection vms = resourceGroup.GetVirtualMachines();
-            NetworkInterfaceCollection nics = resourceGroup.GetNetworkInterfaces();
-            VirtualNetworkCollection vns = resourceGroup.GetVirtualNetworks();
-            PublicIPAddressCollection publicIps = resourceGroup.GetPublicIPAddresses();
-
-            //if (ModelState.IsValid)
-            //{
-
-            // Create a new VM from the formular
-            string virtualNetworkName = "virtualMachineNetwork";
-            string networkInterfaceName = "virtualMachineInterface";
-            string vmName = VirtualM.login + "VM";
-            string computeName = VirtualM.login + "PC";
-            string login = VirtualM.login;
-            string pwd = VirtualM.password;
-            VirtualM.name = vmName;
-
-            // Create the public ip adress
-            PublicIPAddressResource ipResource = InitIp(resourceGroup);
-
-            // Create virtual network
-            VirtualNetworkResource vnetResrouce = vns.CreateOrUpdate(WaitUntil.Completed, virtualNetworkName,
-            new VirtualNetworkData()
+            if (ModelState.IsValid)
             {
-                Location = AzureLocation.NorthEurope,
-                Subnets =
-                {
-                new SubnetData()
-                {
-                    Name = "vmSubNet",
-                    AddressPrefix = "10.0.0.0/24"
-                }
-                },
-                AddressPrefixes =
-                {
-                "10.0.0.0/16"
-                },
-            }).Value;
+                AzureTools azureTools = new(GetUserName());
 
-            // Create network interface
-            NetworkInterfaceResource nicResource = nics.CreateOrUpdate(WaitUntil.Completed, networkInterfaceName,
-            new NetworkInterfaceData()
-            {
-                Location = AzureLocation.NorthEurope,
-                IPConfigurations =
-                {
-                new NetworkInterfaceIPConfigurationData()
-                {
-                    Name = "Primary",
-                    Primary = true,
-                    Subnet = new SubnetData() { Id = vnetResrouce?.Data.Subnets.First().Id },
-                    PrivateIPAllocationMethod = NetworkIPAllocationMethod.Dynamic,
-                    PublicIPAddress = new PublicIPAddressData() { Id = ipResource ?.Data.Id }
-                }
-                }
+                ResourceGroupResource resourceGroup = await azureTools.GetResourceGroupAsync();
+
+                azureTools.CreateVirtualMachine(resourceGroup, VirtualM.login, VirtualM.password);
+
+                VirtualM.name = GetUserName();
+                VirtualM.publicIp = await azureTools.GetIpAdress("ip-"+VirtualM.login);
+
+                _context.Add(VirtualM);
+                await _context.SaveChangesAsync();
+                return RedirectToAction(nameof(Index));
             }
-            ).Value;
-
-            // Create VM
-            VirtualMachineResource vmResource = vms.CreateOrUpdate(WaitUntil.Completed, vmName,
-            new VirtualMachineData(AzureLocation.NorthEurope)
-            {
-                HardwareProfile = new VirtualMachineHardwareProfile()
-                {
-                    VmSize = VirtualMachineSizeType.StandardB2S
-                },
-                OSProfile = new VirtualMachineOSProfile()
-                {
-                    ComputerName = computeName,
-                    AdminUsername = login,
-                    AdminPassword = pwd,
-                    WindowsConfiguration = new WindowsConfiguration
-                    {
-                        ProvisionVmAgent = true,
-                    }
-                },
-                StorageProfile = new VirtualMachineStorageProfile()
-                {
-                    OSDisk = new VirtualMachineOSDisk(DiskCreateOptionType.FromImage),
-                    ImageReference = new ImageReference()
-                    {
-                        Offer = "windows-10",
-                        Publisher = "MicrosoftWindowsDesktop",
-                        Sku = "19h2-pro-g2",
-                        Version = "latest"
-                    }
-                },
-                NetworkProfile = new VirtualMachineNetworkProfile()
-                {
-                    NetworkInterfaces =
-                    {
-                    new VirtualMachineNetworkInterfaceReference()
-                    {
-                        Id = nicResource.Id
-                    }
-                    }
-                },
-            }).Value;
-
-            PublicIPAddressResource getIPResource = InitIp(resourceGroup);
-            VirtualM.publicIp = getIPResource.Data.IPAddress;
-
-            // Ajout de la VM crée a la base de données
-            _context.Add(VirtualM);
-            await _context.SaveChangesAsync();
-            return RedirectToAction(nameof(Index));
-            //}
-            //return View(VirtualM);
-        }
-
-        // Get IP Address
-        private PublicIPAddressResource InitIp(ResourceGroupResource resourceGroup)
-        {
-            var publicIps = resourceGroup.GetPublicIPAddresses();
-            var ipResource = publicIps.CreateOrUpdate(
-                WaitUntil.Completed,
-                "publicIpName",
-                new PublicIPAddressData()
-                {
-                    PublicIPAddressVersion = NetworkIPVersion.IPv4,
-                    PublicIPAllocationMethod = NetworkIPAllocationMethod.Dynamic,
-                    Location = AzureLocation.NorthEurope
-                }).Value;
-
-            return ipResource;
+            return View(VirtualM);
         }
 
         // GET: VirtualM/Edit/5
@@ -228,18 +111,6 @@ namespace WebGamingSDV.Models
             }
             
             return View(VirtualM);
-        }
-
-        private string GetUserName()
-        {
-            string user = string.Empty;
-            if (HttpContext.User.Identity != null &&
-                HttpContext.User.Identity.Name != null)
-            {
-                user = HttpContext.User.Identity.Name;
-                user = user.Split("@")[0].Replace(".", "");
-            }
-            return user;
         }
 
         // POST: VirtualM/Edit/5
@@ -306,32 +177,26 @@ namespace WebGamingSDV.Models
                 return Problem("Entity set 'ApplicationDbContext.VirtualM'  is null.");
             }
             var VirtualM = await _context.VirtualMs.FindAsync(id);
-            Console.WriteLine(id);
-            Console.WriteLine(VirtualM);
             if (VirtualM != null)
             {
 
-                ArmClient client = new ArmClient(new DefaultAzureCredential());
-                SubscriptionResource sub = await client.GetDefaultSubscriptionAsync();
-                ResourceGroupCollection resourceGroups = sub.GetResourceGroups();
-
-                await foreach (ResourceGroupResource resourceGroup in resourceGroups)
-                {
-                    Console.WriteLine("Resource group et data.name " + resourceGroup.Data.Name);
-                    string resourceGroupName = resourceGroup.Data.Name;
-                    ResourceGroupResource resourceGroupToDelete = await resourceGroups.GetAsync(resourceGroupName);
-                    await foreach (VirtualMachineResource vm in resourceGroupToDelete.GetVirtualMachines().GetAllAsync())
-                    {
-                        Console.WriteLine("VM name " + vm.Id.Name);
-                        string vmName = vm.Id.Name;
-                        if (vmName == VirtualM.name)
-                        {
-                            await resourceGroupToDelete.DeleteAsync(WaitUntil.Completed);
-                        }
-                    }
-                }
-
                 _context.VirtualMs.Remove(VirtualM);
+
+                AzureTools azureTools = new(GetUserName());
+                ResourceGroupResource resourceGroup = await azureTools.GetResourceGroupAsync();
+
+                VirtualMachineResource vm = await resourceGroup.GetVirtualMachines().GetAsync("vm-" + VirtualM.login);
+                NetworkInterfaceResource nic = await resourceGroup.GetNetworkInterfaces().GetAsync("nic-" + VirtualM.login);
+                VirtualNetworkResource vnet = await resourceGroup.GetVirtualNetworks().GetAsync("vnet-" + VirtualM.login);
+                PublicIPAddressResource publicIp = await resourceGroup.GetPublicIPAddresses().GetAsync("ip-" + VirtualM.login);
+
+                await vm.DeleteAsync(WaitUntil.Completed, forceDeletion: true);
+                await nic.DeleteAsync(WaitUntil.Completed);
+                await vnet.DeleteAsync(WaitUntil.Completed);
+                await publicIp.DeleteAsync(WaitUntil.Completed);
+
+                // TO DO : delete disk
+
             }
 
             await _context.SaveChangesAsync();
@@ -367,33 +232,49 @@ namespace WebGamingSDV.Models
                 return Problem("Entity set 'ApplicationDbContext.VirtualM'  is null.");
             }
             var VirtualM = await _context.VirtualMs.FindAsync(id);
-            Console.WriteLine("id is " + id);
-            Console.WriteLine("VirtualM is " + VirtualM);
             if (VirtualM != null)
             {
-                // Ne passe pas la dedans
-                Console.WriteLine("salutTestVirtualM");
+                AzureTools azureTools = new(GetUserName());
+                azureTools.VmPowerOffsync();
+            }
 
-                ArmClient client = new ArmClient(new DefaultAzureCredential());
-                SubscriptionResource sub = await client.GetDefaultSubscriptionAsync();
-                ResourceGroupCollection resourceGroups = sub.GetResourceGroups();
+            return RedirectToAction(nameof(Index));
+        }
 
-                await foreach (ResourceGroupResource resourceGroup in resourceGroups)
-                {
-                    string resourceGroupName = resourceGroup.Data.Name;
-                    Console.WriteLine(resourceGroupName);
-                    ResourceGroupResource resourceGroupToDelete = await resourceGroups.GetAsync(resourceGroupName);
-                    await foreach (VirtualMachineResource vm in resourceGroupToDelete.GetVirtualMachines().GetAllAsync())
-                    {
-                        string vmName = vm.Id.Name;
-                        Console.WriteLine(vmName);
-                        if (vmName == VirtualM.name)
-                        {
-                            Console.Write(vmName + " " + resourceGroupName);
-                            await vm.PowerOffAsync(WaitUntil.Completed);
-                        }
-                    }
-                }
+
+        // GET: VirtualM/Shuton
+        public async Task<IActionResult> PowerOn(string id)
+        {
+            if (id == null || _context.VirtualMs == null)
+            {
+                return NotFound();
+            }
+
+            var VirtualM = await _context.VirtualMs
+                .FirstOrDefaultAsync(m => m.name == id);
+
+            if (VirtualM == null)
+            {
+                return NotFound();
+            }
+
+            return View(VirtualM);
+        }
+
+        // POST: VirtualM/Shuton/5
+        [HttpPost, ActionName("PowerOn")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> PowerOnConfirmed(string id)
+        {
+            if (_context.VirtualMs == null)
+            {
+                return Problem("Entity set 'ApplicationDbContext.VirtualM'  is null.");
+            }
+            var VirtualM = await _context.VirtualMs.FindAsync(id);
+            if (VirtualM != null)
+            {
+                AzureTools azureTools = new(GetUserName());
+                azureTools.VmPowerOnAsync();
             }
 
             return RedirectToAction(nameof(Index));
@@ -418,7 +299,7 @@ namespace WebGamingSDV.Models
             return View(VirtualM);
         }
 
-        // POST: VirtualM/ConnectToRDD
+        // POST: VirtualM/ConnectToRDP
         [HttpPost, ActionName("Connect")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ConnectToVMWithRDP(string id)
@@ -429,10 +310,23 @@ namespace WebGamingSDV.Models
             {
                 var hostname = VirtualM.publicIp;
                 Process.Start("mstsc", $"/v:{hostname}");
+                //Process.Start("mstsc", $"/v:{hostname} /d:cmd /c start shell:AppsFolder\\Microsoft.MicrosoftSolitaireCollection_8wekyb3d8bbwe!App");
             }
 
             return View(VirtualM);
 
+        }
+       
+        private string GetUserName()
+        {
+            string user = string.Empty;
+            if (HttpContext.User.Identity != null &&
+                HttpContext.User.Identity.Name != null)
+            {
+                user = HttpContext.User.Identity.Name;
+                user = user.Split("@")[0].Replace(".", "");
+            }
+            return user;
         }
 
         private bool VirtualMExists(string id)
