@@ -1,26 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 
 using Azure;
-using Azure.Core;
-using Azure.Identity;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Resources;
 using Azure.ResourceManager.Compute;
 using Azure.ResourceManager.Network;
-using Azure.ResourceManager.Network.Models;
-using Azure.ResourceManager.Compute.Models;
+
 using WebGamingSDV.Data;
-using Microsoft.CodeAnalysis.Elfie.Serialization;
-using System.Xml.Linq;
 using System.Diagnostics;
-using Microsoft.Azure.Management.Compute.Fluent;
 using Gaming.Tools;
 
 namespace WebGamingSDV.Models
@@ -195,15 +185,13 @@ namespace WebGamingSDV.Models
                 await vnet.DeleteAsync(WaitUntil.Completed);
                 await publicIp.DeleteAsync(WaitUntil.Completed);
 
-                // TO DO : delete disk
-
             }
 
             await _context.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
         }
 
-        // GET: VirtualM/Shutoff
+        // GET: VirtualM/Poweroff
         public async Task<IActionResult> PowerOff(string id)
         {
             if (id == null || _context.VirtualMs == null)
@@ -222,7 +210,7 @@ namespace WebGamingSDV.Models
             return View(VirtualM);
         }
 
-        // POST: VirtualM/Shutoff/5
+        // POST: VirtualM/PowerOff/5
         [HttpPost, ActionName("PowerOff")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> PowerOffConfirmed(string id)
@@ -242,7 +230,7 @@ namespace WebGamingSDV.Models
         }
 
 
-        // GET: VirtualM/Shuton
+        // GET: VirtualM/PowerOn
         public async Task<IActionResult> PowerOn(string id)
         {
             if (id == null || _context.VirtualMs == null)
@@ -261,7 +249,7 @@ namespace WebGamingSDV.Models
             return View(VirtualM);
         }
 
-        // POST: VirtualM/Shuton/5
+        // POST: VirtualM/PowerOn/5
         [HttpPost, ActionName("PowerOn")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> PowerOnConfirmed(string id)
@@ -309,8 +297,37 @@ namespace WebGamingSDV.Models
             if (VirtualM != null)
             {
                 var hostname = VirtualM.publicIp;
-                Process.Start("mstsc", $"/v:{hostname}");
+                //Process.Start("mstsc", $"/v:{hostname}");
                 //Process.Start("mstsc", $"/v:{hostname} /d:cmd /c start shell:AppsFolder\\Microsoft.MicrosoftSolitaireCollection_8wekyb3d8bbwe!App");
+
+                string rdpFileName = "mstsc.exe";
+                string rdpArguments = $"/v:{hostname}";
+
+                string solitaireFileName = "cmd.exe";
+                string solitaireArguments = "start shell:AppsFolder\\Microsoft.MicrosoftSolitaireCollection_8wekyb3d8bbwe!App";
+
+                // Étape 1 : Lancement de l'application RDP dans un processus distinct
+                Process rdpProcess = new Process();
+                rdpProcess.StartInfo.FileName = rdpFileName;
+                rdpProcess.StartInfo.Arguments = rdpArguments;
+                rdpProcess.StartInfo.UseShellExecute = true;
+                rdpProcess.Start();
+
+                // Étape 2 : Lancement de l'application Solitaire dans un processus distinct
+                Process solitaireProcess = new Process();
+                solitaireProcess.StartInfo.FileName = solitaireFileName;
+                solitaireProcess.StartInfo.Arguments = solitaireArguments;
+                solitaireProcess.StartInfo.UseShellExecute = false;
+                solitaireProcess.StartInfo.RedirectStandardOutput = true;
+                solitaireProcess.Start();
+
+                // Attendre la fin du processus Solitaire
+                solitaireProcess.WaitForExit();
+
+                // Attendre la fin du processus RDP
+                rdpProcess.WaitForExit();
+
+
             }
 
             return View(VirtualM);

@@ -161,13 +161,16 @@ namespace WebGamingSDV.Models
                     },
                     StorageProfile = new VirtualMachineStorageProfile()
                     {
-                        OSDisk = new VirtualMachineOSDisk(DiskCreateOptionType.FromImage),
+                        OSDisk = new VirtualMachineOSDisk(DiskCreateOptionType.FromImage)
+                        {
+                            DeleteOption = DiskDeleteOptionType.Delete,
+                        },
                         ImageReference = new ImageReference()
                         {
                             Offer = "windows-10",
                             Publisher = "MicrosoftWindowsDesktop",
                             Sku = "19h2-pro-g2",
-                            Version = "latest"
+                            Version = "latest",
                         }
                     },
                     NetworkProfile = new VirtualMachineNetworkProfile()

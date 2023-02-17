@@ -1,8 +1,35 @@
 ﻿@{
-    ViewData["Title"] = "Home Page";
+	ViewData["Title"] = "Home Page";
 }
-
 <div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+	<h1 class="display-4">Welcome to WebGamingSDV !</h1>
+	<br/>
+	<div class="row">
+		<div class="col-sm-4">
+			<div class="card" style="width: 18rem;">
+				<img class="card-img-top" src="https://tse4.mm.bing.net/th?id=OIP.Xn5euEp8Rl9rhgbt8s6Y6gHaHa" alt="Card image cap">
+				<div class="card-body">
+					<p class="card-text text-a">
+						Welcome to our machine deployment wesite, where we offer a quick and easy solution for creating and managing your own work environments.
+					</p>
+				</div>
+			</div>
+		</div>
+		<div class="col-sm-8">
+			<div class="card">
+				<div class="card-header">
+					WebGamingSDV
+				</div>
+				<div class="card-body">
+					<h5 class="card-title">
+						Deployed with Azure
+					</h5>
+					<p class="card-text">
+						Create, modify, start, stop or connect your machine:
+					</p>
+					<a class="btn btn-primary" asp-area="" asp-controller="VirtualM" asp-action="Index">Go to VM List</a>
+				</div>
+			</div>
+		</div>
+	</div>
 </div>

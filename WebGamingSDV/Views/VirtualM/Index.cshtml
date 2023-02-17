@@ -4,11 +4,15 @@
     ViewData["Title"] = "Index";
 }
 
-<h1>Index</h1>
+<h1>Here is your current machine : </h1>
+<br/>
 
+@if (!Model.Any()){
 <p>
-    <a asp-action="Create">Create New VirtualMachine</a>
+	<a asp-action="Create" class="btn btn-success">Create New VirtualMachine</a>
 </p>
+}
+
 <table class="table">
     <thead>
         <tr>
@@ -41,24 +45,12 @@
                 @Html.DisplayFor(modelItem => item.name)
             </td>
             <td>
-                <a asp-action="Edit" asp-route-id="@item.name">Edit</a> |
-                <a asp-action="Details" asp-route-id="@item.name">Details</a> |
-                <a asp-action="Delete" asp-route-id="@item.name">Delete</a> |
-
-                <a asp-action="PowerOff" asp-route-id="@item.name">PowerOff</a>
-                <a asp-action="PowerOn" asp-route-id="@item.name">PowerOn</a>
-
-                <a asp-action="Connect" asp-route-id="@item.name">Connect</a>
-
-               @* <form asp-action="PowerOn">
-                    <input type="hidden" asp-for="@item.name" />
-                    <input type="submit" value="PowerOn" class="btn btn-success" /> |
-                </form>
-                <form asp-action="PowerOff">
-                     <input type="hidden" asp-for="@item.name" />
-                    <input type="submit" value="PowerOff" class="btn btn-danger" /> |
-                </form>*@
-
+                    <button class="btn btn-primary"><a asp-action="Edit" asp-route-id="@item.name">Edit</a></button>
+                    <button class="btn btn-info"><a asp-action="Details" asp-route-id="@item.name">Details</a></button>
+                    <button class="btn btn-danger"><a asp-action="Delete" asp-route-id="@item.name">Delete</a></button>
+                    <button class="btn btn-warning"><a asp-action="PowerOff" asp-route-id="@item.name">PowerOff</a></button>
+                    <button class="btn btn-success"><a asp-action="PowerOn" asp-route-id="@item.name">PowerOn</a></button>
+                    <button class="btn btn-secondary"><a asp-action="Connect" asp-route-id="@item.name">Connect</a></button>
             </td>
         </tr>
 }
